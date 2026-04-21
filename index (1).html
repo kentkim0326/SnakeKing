@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SnakeMon 🐍</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#1a0a2e;font-family:'Nunito',sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden;}
+
+#game-wrap{position:relative;display:flex;gap:16px;align-items:flex-start;}
+
+#sidebar{width:170px;display:flex;flex-direction:column;gap:10px;}
+
+.panel{background:rgba(255,255,255,0.08);border:2px solid rgba(255,255,255,0.15);border-radius:16px;padding:12px;backdrop-filter:blur(10px);}
+.panel-title{font-family:'Fredoka One',cursive;color:#ffd700;font-size:14px;margin-bottom:8px;text-align:center;letter-spacing:1px;}
+
+#score-val{font-family:'Fredoka One',cursive;font-size:32px;color:#fff;text-align:center;}
+#level-val{font-family:'Fredoka One',cursive;font-size:26px;color:#a78bfa;text-align:center;}
+
+#xp-bar-wrap{background:rgba(0,0,0,0.3);border-radius:999px;height:9px;overflow:hidden;margin-top:5px;}
+#xp-bar{height:100%;background:linear-gradient(90deg,#a78bfa,#f472b6);border-radius:999px;transition:width 0.3s;width:0%;}
+
+.food-legend{display:flex;flex-direction:column;gap:6px;}
+.food-item{display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;}
+.food-dot{width:13px;height:13px;border-radius:50%;flex-shrink:0;}
+
+#skill-slots{display:flex;flex-direction:column;gap:7px;}
+.skill-slot{background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:7px 9px;font-size:12px;color:#94a3b8;min-height:30px;display:flex;align-items:center;gap:6px;}
+.skill-slot.active{border-color:#a78bfa;color:#e9d5ff;background:rgba(167,139,250,0.1);}
+
+#canvas-wrap{position:relative;}
+canvas{border-radius:20px;display:block;border:3px solid rgba(255,255,255,0.1);}
+
+#overlay{position:absolute;inset:0;border-radius:17px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.82);backdrop-filter:blur(6px);z-index:10;}
+#overlay h1{font-family:'Fredoka One',cursive;font-size:48px;color:#ffd700;text-shadow:0 0 30px rgba(255,215,0,0.5);margin-bottom:10px;}
+#overlay p{color:#cbd5e1;font-size:15px;margin-bottom:28px;text-align:center;line-height:1.7;white-space:pre-line;}
+#overlay.hidden{display:none;}
+
+.btn{font-family:'Fredoka One',cursive;font-size:20px;padding:14px 42px;border:none;border-radius:999px;cursor:pointer;transition:all 0.2s;letter-spacing:1px;}
+#start-btn{background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;box-shadow:0 4px 20px rgba(239,68,68,0.4);}
+#start-btn:hover{transform:scale(1.05);box-shadow:0 6px 30px rgba(239,68,68,0.6);}
+
+#skill-pick-overlay{position:absolute;inset:0;border-radius:17px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.88);backdrop-filter:blur(8px);z-index:20;}
+#skill-pick-overlay.hidden{display:none;}
+#skill-pick-overlay h2{font-family:'Fredoka One',cursive;color:#ffd700;font-size:30px;margin-bottom:6px;}
+#skill-pick-overlay p{color:#94a3b8;font-size:13px;margin-bottom:22px;}
+#skill-cards{display:flex;gap:14px;}
+.skill-card{background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.15);border-radius:16px;padding:18px;width:120px;cursor:pointer;transition:all 0.2s;text-align:center;}
+.skill-card:hover{border-color:#a78bfa;background:rgba(167,139,250,0.15);transform:translateY(-4px);}
+.skill-card .sk-icon{font-size:32px;margin-bottom:8px;}
+.skill-card .sk-name{font-family:'Fredoka One',cursive;color:#e2e8f0;font-size:14px;margin-bottom:4px;}
+.skill-card .sk-desc{color:#94a3b8;font-size:11px;line-height:1.4;}
+
+#effect-msg{position:absolute;top:14px;left:50%;transform:translateX(-50%);font-family:'Fredoka One',cursive;font-size:18px;color:#ffd700;text-shadow:0 2px 8px rgba(0,0,0,0.8);pointer-events:none;transition:opacity 0.5s;opacity:0;white-space:nowrap;z-index:30;}
+
+#wave-banner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Fredoka One',cursive;font-size:36px;color:#fff;text-shadow:0 0 20px rgba(255,255,255,0.8);pointer-events:none;opacity:0;z-index:25;transition:opacity 0.5s;}
+</style>
+</head>
+<body>
+<div id="game-wrap">
+  <div id="sidebar">
+    <div class="panel">
+      <div class="panel-title">⭐ SCORE</div>
+      <div id="score-val">0</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">🐍 LEVEL</div>
+      <div id="level-val">1</div>
+      <div id="xp-bar-wrap"><div id="xp-bar"></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">🍎 FOODS</div>
+      <div class="food-legend">
+        <div class="food-item"><div class="food-dot" style="background:#ef4444"></div>🍎 성장</div>
+        <div class="food-item"><div class="food-dot" style="background:#f59e0b"></div>⚡ 가속</div>
+        <div class="food-item"><div class="food-dot" style="background:#3b82f6"></div>❄️ 얼림</div>
+        <div class="food-item"><div class="food-dot" style="background:#a855f7"></div>💜 독</div>
+        <div class="food-item"><div class="food-dot" style="background:#ffd700;border:1px solid #fff"></div>⭐ XP+</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">✨ SKILLS</div>
+      <div id="skill-slots">
+        <div class="skill-slot" id="sk0">비어있음</div>
+        <div class="skill-slot" id="sk1">비어있음</div>
+        <div class="skill-slot" id="sk2">비어있음</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="canvas-wrap">
+    <canvas id="c" width="640" height="640"></canvas>
+    <div id="overlay">
+      <h1>🐍 SnakeMon</h1>
+      <p>먹이마다 다른 능력 발동!\n레벨업하면 스킬을 선택해요\n\n← → ↑ ↓ 방향키로 이동</p>
+      <button class="btn" id="start-btn">START GAME</button>
+    </div>
+    <div id="skill-pick-overlay" class="hidden">
+      <h2>✨ 레벨 업!</h2>
+      <p>스킬을 하나 선택하세요</p>
+      <div id="skill-cards"></div>
+    </div>
+    <div id="effect-msg"></div>
+    <div id="wave-banner"></div>
+  </div>
+</div>
+
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+
+// ✅ 필드 크기 변경: 480→640, 셀 20→20, 칸 수 24→32
+const CELL=20, COLS=32, ROWS=32;
+
+const FOODS=[
+  {color:'#ef4444',emoji:'🍎',name:'성장',effect:'grow'},
+  {color:'#f59e0b',emoji:'⚡',name:'가속',effect:'speed'},
+  {color:'#3b82f6',emoji:'❄️',name:'얼림',effect:'freeze'},
+  {color:'#a855f7',emoji:'💜',name:'독',effect:'poison'},
+  {color:'#ffd700',emoji:'⭐',name:'XP+',effect:'xp'},
+];
+const SKILLS=[
+  {icon:'🛡️',name:'꼬리 방어막',desc:'벽에 한 번 부딪혀도 살아남아요',key:'shield'},
+  {icon:'🧲',name:'자석 흡수',desc:'가까운 먹이를 자동으로 당겨요',key:'magnet'},
+  {icon:'💚',name:'더블 성장',desc:'빨간 먹이 효과가 2배예요',key:'double'},
+  {icon:'🔥',name:'화염 꼬리',desc:'이동 경로에 불꽃을 남겨요',key:'fire'},
+  {icon:'⏱️',name:'시간 왜곡',desc:'가속 지속시간이 3배로 늘어요',key:'timeWarp'},
+  {icon:'🌪️',name:'소용돌이',desc:'화면 전체 먹이를 끌어당겨요',key:'vortex'},
+];
+
+let snake,dir,nextDir,foods,score,level,xp,xpNeeded;
+let gameLoop;
+let baseSpeed=150,currentSpeed;
+let speedTimer=0,freezeTimer=0,poisonTimer=0;
+let activeSkills=[];
+let wave=1,waveTimer=0;
+let particles=[];
+let gameRunning=false;
+let shieldUsed=false;
+
+function initGame(){
+  const cx=Math.floor(COLS/2), cy=Math.floor(ROWS/2);
+  snake=[{x:cx,y:cy},{x:cx-1,y:cy},{x:cx-2,y:cy}];
+  dir={x:1,y:0};nextDir={x:1,y:0};
+  foods=[];score=0;level=1;xp=0;xpNeeded=5;
+  baseSpeed=150;currentSpeed=150;
+  speedTimer=0;freezeTimer=0;poisonTimer=0;
+  activeSkills=[];wave=1;waveTimer=0;particles=[];
+  shieldUsed=false;
+  for(let i=0;i<4;i++)spawnFood();
+  updateUI();
+}
+
+function spawnFood(){
+  if(foods.length>=10)return;
+  let pos,tries=0;
+  do{
+    pos={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS)};
+    tries++;
+  }while(tries<50&&(snake.some(s=>s.x===pos.x&&s.y===pos.y)||foods.some(f=>f.x===pos.x&&f.y===pos.y)));
+  const type=FOODS[Math.floor(Math.random()*FOODS.length)];
+  foods.push({...pos,...type,bob:Math.random()*Math.PI*2});
+}
+
+function getBgColors(){
+  if(wave<=5)return{bg:'#1a3a1a',grid:'#1e4a1e'};
+  if(wave<=10)return{bg:'#1a1a3a',grid:'#1e1e4a'};
+  return{bg:'#3a1a1a',grid:'#4a1e1e'};
+}
+
+function drawBg(){
+  const c=getBgColors();
+  ctx.fillStyle=c.bg;
+  ctx.fillRect(0,0,COLS*CELL,ROWS*CELL);
+  ctx.strokeStyle=c.grid;
+  ctx.lineWidth=0.5;
+  for(let i=0;i<=COLS;i++){ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,ROWS*CELL);ctx.stroke();}
+  for(let j=0;j<=ROWS;j++){ctx.beginPath();ctx.moveTo(0,j*CELL);ctx.lineTo(COLS*CELL,j*CELL);ctx.stroke();}
+
+  // wave 6+ 장애물
+  if(wave>=6){
+    ctx.fillStyle='rgba(99,102,241,0.25)';
+    [[4,4],[4,26],[26,4],[26,26],[15,15]].forEach(([x,y])=>{
+      ctx.fillRect(x*CELL,y*CELL,CELL*2,CELL*2);
+    });
+  }
+  // wave 11+ 용암
+  if(wave>=11){
+    ctx.fillStyle='rgba(239,68,68,0.3)';
+    for(let i=0;i<8;i++){
+      const lx=(i*4+2)%COLS, ly=Math.floor(i/3)*5+2;
+      ctx.fillRect(lx*CELL,ly*CELL,CELL,CELL);
+    }
+  }
+}
+
+function drawSnake(){
+  snake.forEach((seg,i)=>{
+    const t=i/snake.length;
+    if(activeSkills.includes('fire')&&i>0){
+      ctx.fillStyle=`rgba(251,146,60,${0.35*(1-t)})`;
+      ctx.fillRect(seg.x*CELL+2,seg.y*CELL+2,CELL-4,CELL-4);
+    }
+    ctx.beginPath();
+    ctx.roundRect(seg.x*CELL+1,seg.y*CELL+1,CELL-2,CELL-2,i===0?10:8);
+    ctx.fillStyle=poisonTimer>0
+      ?(i===0?'#7c3aed':'#a855f7')
+      :(i===0?'#4ade80':`hsl(${140-t*20},70%,${55-t*10}%)`);
+    ctx.fill();
+    if(i===0){
+      ctx.fillStyle='#fff';
+      ctx.fillRect(seg.x*CELL+5,seg.y*CELL+4,3,3);
+      ctx.fillRect(seg.x*CELL+12,seg.y*CELL+4,3,3);
+      if(activeSkills.includes('shield')&&!shieldUsed){
+        ctx.strokeStyle='rgba(99,102,241,0.7)';
+        ctx.lineWidth=2;
+        ctx.beginPath();
+        ctx.arc(seg.x*CELL+CELL/2,seg.y*CELL+CELL/2,CELL*0.85,0,Math.PI*2);
+        ctx.stroke();
+      }
+    }
+  });
+}
+
+function drawFoods(){
+  foods.forEach(f=>{
+    f.bob+=0.07;
+    const by=Math.sin(f.bob)*2;
+    const cx=f.x*CELL+CELL/2, cy=f.y*CELL+CELL/2+by;
+    ctx.shadowBlur=14;ctx.shadowColor=f.color;
+    ctx.fillStyle=f.color;
+    ctx.beginPath();ctx.arc(cx,cy,7,0,Math.PI*2);ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.font='11px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(f.emoji,cx,cy);
+  });
+}
+
+function drawParticles(){
+  particles=particles.filter(p=>p.life>0);
+  particles.forEach(p=>{
+    p.x+=p.vx;p.y+=p.vy;p.vy+=0.2;p.life-=3;
+    ctx.globalAlpha=p.life/100;
+    ctx.fillStyle=p.color;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();
+  });
+  ctx.globalAlpha=1;
+}
+
+function spawnParticles(x,y,color){
+  for(let i=0;i<8;i++){
+    particles.push({
+      x:x*CELL+CELL/2,y:y*CELL+CELL/2,
+      vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4-2,
+      color,size:Math.random()*4+2,life:100
+    });
+  }
+}
+
+function showMsg(msg,color='#ffd700'){
+  const el=document.getElementById('effect-msg');
+  el.textContent=msg;el.style.color=color;el.style.opacity='1';
+  setTimeout(()=>{el.style.opacity='0';},1200);
+}
+
+function showWaveBanner(txt){
+  const el=document.getElementById('wave-banner');
+  el.textContent=txt;el.style.opacity='1';
+  setTimeout(()=>{el.style.opacity='0';},1500);
+}
+
+function updateUI(){
+  document.getElementById('score-val').textContent=score;
+  document.getElementById('level-val').textContent=level;
+  document.getElementById('xp-bar').style.width=(xp/xpNeeded*100)+'%';
+  for(let i=0;i<3;i++){
+    const el=document.getElementById('sk'+i);
+    if(i<activeSkills.length){
+      const s=SKILLS.find(x=>x.key===activeSkills[i]);
+      if(s){el.textContent=s.icon+' '+s.name;el.classList.add('active');}
+    }else{
+      el.textContent='비어있음';el.classList.remove('active');
+    }
+  }
+}
+
+function applyEffect(food,hx,hy){
+  spawnParticles(hx,hy,food.color);
+  switch(food.effect){
+    case'grow':
+      score+=10;xp++;
+      if(activeSkills.includes('double')){snake.push({...snake[snake.length-1]});score+=5;}
+      showMsg('🍎 성장!','#4ade80');
+      break;
+    case'speed':
+      score+=15;xp++;
+      const mult=activeSkills.includes('timeWarp')?3:1;
+      currentSpeed=Math.max(60,baseSpeed-60);
+      speedTimer=60*mult;
+      showMsg('⚡ 가속!','#f59e0b');
+      clearInterval(gameLoop);
+      gameLoop=setInterval(tick,currentSpeed);
+      break;
+    case'freeze':
+      score+=20;xp+=2;
+      freezeTimer=40;
+      showMsg('❄️ 얼림!','#3b82f6');
+      break;
+    case'poison':
+      score+=25;xp+=2;
+      poisonTimer=30;
+      showMsg('💜 독 발동!','#a855f7');
+      break;
+    case'xp':
+      score+=30;xp+=3;
+      showMsg('⭐ XP +3!','#ffd700');
+      break;
+  }
+  if(xp>=xpNeeded)levelUp();
+  updateUI();
+}
+
+function levelUp(){
+  xp-=xpNeeded;level++;xpNeeded=level*5+5;
+  clearInterval(gameLoop);
+  showSkillPick();
+}
+
+function showSkillPick(){
+  const overlay=document.getElementById('skill-pick-overlay');
+  const cards=document.getElementById('skill-cards');
+  cards.innerHTML='';
+  const available=SKILLS.filter(s=>!activeSkills.includes(s.key));
+  const picks=available.sort(()=>Math.random()-0.5).slice(0,3);
+  if(picks.length===0){gameLoop=setInterval(tick,currentSpeed);return;}
+  picks.forEach(sk=>{
+    const div=document.createElement('div');
+    div.className='skill-card';
+    div.innerHTML=`<div class="sk-icon">${sk.icon}</div><div class="sk-name">${sk.name}</div><div class="sk-desc">${sk.desc}</div>`;
+    div.onclick=()=>{
+      if(activeSkills.length<3)activeSkills.push(sk.key);
+      overlay.classList.add('hidden');
+      updateUI();
+      gameLoop=setInterval(tick,currentSpeed);
+    };
+    cards.appendChild(div);
+  });
+  overlay.classList.remove('hidden');
+}
+
+function tick(){
+  dir={...nextDir};
+  let hx=snake[0].x+dir.x, hy=snake[0].y+dir.y;
+
+  // 자석
+  if(activeSkills.includes('magnet')){
+    foods.forEach(f=>{
+      const dx=hx-f.x, dy=hy-f.y;
+      if(Math.abs(dx)<=3&&Math.abs(dy)<=3){
+        f.x+=dx>0?1:dx<0?-1:0;
+        f.y+=dy>0?1:dy<0?-1:0;
+      }
+    });
+  }
+
+  // 벽 충돌
+  if(hx<0||hx>=COLS||hy<0||hy>=ROWS){
+    if(activeSkills.includes('shield')&&!shieldUsed){
+      hx=Math.max(0,Math.min(COLS-1,hx));
+      hy=Math.max(0,Math.min(ROWS-1,hy));
+      shieldUsed=true;
+      showMsg('🛡️ 방어막!','#a78bfa');
+    }else{endGame();return;}
+  }
+
+  // 자기 몸 충돌
+  if(snake.some(s=>s.x===hx&&s.y===hy)){endGame();return;}
+
+  // 용암 충돌
+  if(wave>=11){
+    const lava=[];
+    for(let i=0;i<8;i++)lava.push({x:(i*4+2)%COLS,y:Math.floor(i/3)*5+2});
+    if(lava.some(l=>l.x===hx&&l.y===hy)){endGame();return;}
+  }
+
+  snake.unshift({x:hx,y:hy});
+
+  // 먹이 충돌
+  const fi=foods.findIndex(f=>f.x===hx&&f.y===hy);
+  if(fi>=0){
+    const food=foods.splice(fi,1)[0];
+    applyEffect(food,hx,hy);
+    spawnFood();
+    if(food.effect!=='grow')snake.pop();
+  }else{
+    snake.pop();
+  }
+
+  // 독 틱
+  if(poisonTimer>0){
+    poisonTimer--;
+    if(poisonTimer%10===0&&snake.length>3)snake.pop();
+  }
+
+  // 가속 타이머
+  if(speedTimer>0){
+    speedTimer--;
+    if(speedTimer===0){
+      currentSpeed=baseSpeed;
+      clearInterval(gameLoop);
+      gameLoop=setInterval(tick,currentSpeed);
+    }
+  }
+
+  // 웨이브
+  waveTimer++;
+  if(waveTimer>=60){
+    waveTimer=0;wave++;
+    baseSpeed=Math.max(80,150-wave*5);
+    if(speedTimer===0)currentSpeed=baseSpeed;
+    if(wave===6)showWaveBanner('🌙 WAVE 6 — 밤!');
+    else if(wave===11)showWaveBanner('🌋 WAVE 11 — 용암!');
+    else showWaveBanner('WAVE '+wave);
+  }
+
+  ctx.clearRect(0,0,COLS*CELL,ROWS*CELL);
+  drawBg();
+  drawParticles();
+  drawFoods();
+  drawSnake();
+}
+
+function endGame(){
+  clearInterval(gameLoop);
+  gameRunning=false;
+  const overlay=document.getElementById('overlay');
+  overlay.querySelector('h1').textContent='💀 GAME OVER';
+  overlay.querySelector('p').textContent='점수: '+score+' | 레벨: '+level+' | WAVE: '+wave+'\n\n다시 도전해볼까요?';
+  overlay.querySelector('button').textContent='RETRY';
+  overlay.classList.remove('hidden');
+}
+
+document.getElementById('start-btn').onclick=()=>{
+  document.getElementById('overlay').classList.add('hidden');
+  initGame();
+  gameRunning=true;
+  clearInterval(gameLoop);
+  gameLoop=setInterval(tick,currentSpeed);
+};
+
+document.addEventListener('keydown',e=>{
+  if(!gameRunning)return;
+  const map={ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0}};
+  if(map[e.key]){
+    e.preventDefault();
+    const nd=map[e.key];
+    if(nd.x!==-dir.x||nd.y!==-dir.y)nextDir=nd;
+  }
+});
+</script>
+</body>
+</html>
